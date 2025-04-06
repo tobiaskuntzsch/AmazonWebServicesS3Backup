@@ -1,92 +1,151 @@
-"""Support for Amazon S3 backups."""
+"""Backup platform for the Amazon S3 Backup integration."""
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator, Callable, Coroutine
 import logging
-import os
-from typing import cast
+from typing import Any
+
+from botocore.exceptions import ClientError, NoCredentialsError
 
 from homeassistant.components.backup import (
-    BackupPlatform,
-    BackupPlatformError,
-    BackupRequest,
+    AgentBackup,
+    BackupAgent,
+    BackupAgentError,
+    BackupNotFound,
 )
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.aiohttp_client import ChunkAsyncStreamIterator
+from homeassistant.util import slugify
 
+from . import DATA_BACKUP_AGENT_LISTENERS
 from .api import S3Client
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(
-    hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities
-) -> None:
-    """Set up Amazon S3 backup from a config entry."""
-    _LOGGER.debug("Setting up Amazon S3 backup platform")
-    client: S3Client = hass.data[DOMAIN][config_entry.entry_id]
+async def async_get_backup_agents(
+    hass: HomeAssistant,
+    **kwargs: Any,
+) -> list[BackupAgent]:
+    """Return a list of backup agents."""
+    entries = hass.config_entries.async_loaded_entries(DOMAIN)
+    return [AmazonS3BackupAgent(hass, entry) for entry in entries]
 
-    async def async_create_backup(request: BackupRequest) -> None:
-        """Create backup using config entry."""
+
+@callback
+def async_register_backup_agents_listener(
+    hass: HomeAssistant,
+    *,
+    listener: Callable[[], None],
+    **kwargs: Any,
+) -> Callable[[], None]:
+    """Register a listener to be called when agents are added or removed.
+
+    :return: A function to unregister the listener.
+    """
+    hass.data.setdefault(DATA_BACKUP_AGENT_LISTENERS, []).append(listener)
+
+    @callback
+    def remove_listener() -> None:
+        """Remove the listener."""
+        hass.data[DATA_BACKUP_AGENT_LISTENERS].remove(listener)
+        if not hass.data[DATA_BACKUP_AGENT_LISTENERS]:
+            del hass.data[DATA_BACKUP_AGENT_LISTENERS]
+
+    return remove_listener
+
+
+class AmazonS3BackupAgent(BackupAgent):
+    """Amazon S3 backup agent."""
+
+    domain = DOMAIN
+
+    def __init__(self, hass: HomeAssistant, config_entry) -> None:
+        """Initialize the Amazon S3 backup agent."""
+        super().__init__()
+        self.hass = hass
+        self.name = config_entry.title
+        self.unique_id = slugify(config_entry.entry_id)
+        self._client: S3Client = hass.data[DOMAIN][config_entry.entry_id]
+
+    async def async_upload_backup(
+        self,
+        *,
+        open_stream: Callable[[], Coroutine[Any, Any, AsyncIterator[bytes]]],
+        backup: AgentBackup,
+        **kwargs: Any,
+    ) -> None:
+        """Upload a backup.
+
+        :param open_stream: A function returning an async iterator that yields bytes.
+        :param backup: Metadata about the backup that should be uploaded.
+        """
         try:
-            await client.async_upload_backup(request.backup_open_stream, request.backup)
-        except Exception as err:
-            _LOGGER.error("Error uploading backup to Amazon S3: %s", err)
-            raise BackupPlatformError(f"Error uploading to Amazon S3: {err}") from err
+            _LOGGER.debug("Uploading backup to Amazon S3: %s", backup.backup_id)
+            await self._client.async_upload_backup(open_stream, backup)
+            _LOGGER.debug("Successfully uploaded backup to Amazon S3: %s", backup.backup_id)
+        except (ClientError, NoCredentialsError, HomeAssistantError, TimeoutError) as err:
+            raise BackupAgentError(f"Failed to upload backup to Amazon S3: {err}") from err
 
-    async def async_download_backup(backup_id: str) -> str:
-        """Download backup using config entry."""
+    async def async_list_backups(self, **kwargs: Any) -> list[AgentBackup]:
+        """List backups."""
         try:
-            return await client.async_download(backup_id)
-        except Exception as err:
-            _LOGGER.error("Error downloading backup from Amazon S3: %s", err)
-            raise BackupPlatformError(f"Error downloading from Amazon S3: {err}") from err
+            _LOGGER.debug("Listing backups from Amazon S3")
+            backups = await self._client.async_list_backups()
+            _LOGGER.debug("Retrieved %d backups from Amazon S3", len(backups))
+            return backups
+        except (ClientError, NoCredentialsError, HomeAssistantError, TimeoutError) as err:
+            raise BackupAgentError(f"Failed to list backups from Amazon S3: {err}") from err
 
-    async def async_remove_backup(backup_id: str) -> None:
-        """Remove backup using config entry."""
+    async def async_get_backup(
+        self,
+        backup_id: str,
+        **kwargs: Any,
+    ) -> AgentBackup:
+        """Return a backup."""
+        backups = await self.async_list_backups()
+        for backup in backups:
+            if backup.backup_id == backup_id:
+                return backup
+        raise BackupNotFound(f"Backup {backup_id} not found")
+
+    async def async_download_backup(
+        self,
+        backup_id: str,
+        **kwargs: Any,
+    ) -> str:
+        """Download a backup file.
+
+        :param backup_id: The ID of the backup that was returned in async_list_backups.
+        :return: Path to the downloaded backup file.
+        """
+        _LOGGER.debug("Downloading backup_id: %s", backup_id)
         try:
-            await client.async_delete(backup_id)
-        except Exception as err:
-            _LOGGER.error("Error removing backup from Amazon S3: %s", err)
-            raise BackupPlatformError(f"Error removing from Amazon S3: {err}") from err
+            temp_file = await self._client.async_download(backup_id)
+            _LOGGER.debug("Downloaded backup to: %s", temp_file)
+            return temp_file
+        except (ClientError, NoCredentialsError, HomeAssistantError, TimeoutError) as err:
+            raise BackupAgentError(f"Failed to download backup from Amazon S3: {err}") from err
+        except FileNotFoundError:
+            raise BackupNotFound(f"Backup {backup_id} not found")
 
-    async def async_list_backups() -> list:
-        """List backups using config entry."""
+    async def async_delete_backup(
+        self,
+        backup_id: str,
+        **kwargs: Any,
+    ) -> None:
+        """Delete a backup file.
+
+        :param backup_id: The ID of the backup that was returned in async_list_backups.
+        """
+        _LOGGER.debug("Deleting backup_id: %s", backup_id)
         try:
-            return await client.async_list_backups()
-        except Exception as err:
-            _LOGGER.error("Error listing backups from Amazon S3: %s", err)
-            raise BackupPlatformError(f"Error listing from Amazon S3: {err}") from err
-
-    # Create the backup platform
-    platform = BackupPlatform(
-        domain=DOMAIN,
-        name=config_entry.title,
-        create_backup=async_create_backup,
-        download_backup=async_download_backup,
-        remove_backup=async_remove_backup,
-        list_backups=async_list_backups,
-    )
-
-    # Try to register the platform directly with the backup component
-    # This approach works for Home Assistant 2025
-    try:
-        from homeassistant.components.backup import async_register_backup_platform
-        _LOGGER.info("Registering Amazon S3 backup platform using async_register_backup_platform")
-        async_register_backup_platform(hass, platform)
-    except ImportError:
-        # Fallback for Home Assistant 2025
-        _LOGGER.info("Registering Amazon S3 backup platform using internal API")
-        from homeassistant.components import backup
-        
-        if hasattr(backup, "PLATFORMS"):
-            # Try to register using direct assignment to PLATFORMS
-            backup.PLATFORMS.append(platform)
-            _LOGGER.info("Added platform to backup.PLATFORMS")
-        elif hasattr(backup, "_platforms"):
-            # Try to register using direct assignment to _platforms
-            backup._platforms.append(platform)
-            _LOGGER.info("Added platform to backup._platforms")
-        else:
-            _LOGGER.error("Could not register backup platform, unsupported Home Assistant version")
+            await self._client.async_delete(backup_id)
+            _LOGGER.debug("Deleted backup_id: %s from Amazon S3", backup_id)
+        except (ClientError, NoCredentialsError, HomeAssistantError, TimeoutError) as err:
+            raise BackupAgentError(f"Failed to delete backup from Amazon S3: {err}") from err
+        except FileNotFoundError:
+            raise BackupNotFound(f"Backup {backup_id} not found")
