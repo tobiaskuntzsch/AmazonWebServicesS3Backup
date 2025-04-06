@@ -1,0 +1,12 @@
+{
+  "domain": "amazon_s3_backup",
+  "name": "Amazon S3 Backup",
+  "after_dependencies": ["backup"],
+  "codeowners": ["@tobiaskuntzsch"],
+  "config_flow": true,
+  "documentation": "https://github.com/tobiaskuntzsch/AmazonWebServicesS3Backup",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "requirements": ["boto3>=1.28.0"],
+  "version": "0.1.0"
+}

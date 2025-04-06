@@ -1,0 +1,38 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Amazon S3 Backup",
+        "description": "Erstellen Sie ein Backup Ihrer Home Assistant-Konfiguration in Amazon S3",
+        "data": {
+          "name": "Name"
+        }
+      },
+      "credentials": {
+        "title": "AWS Anmeldeinformationen",
+        "description": "Bitte geben Sie Ihre AWS-Zugangsdaten ein",
+        "data": {
+          "aws_access_key_id": "AWS Access Key ID",
+          "aws_secret_access_key": "AWS Secret Access Key",
+          "region_name": "AWS Region"
+        }
+      },
+      "bucket": {
+        "title": "S3 Bucket Konfiguration",
+        "description": "Wählen Sie den S3 Bucket und optionalen Pfad für Ihre Backups",
+        "data": {
+          "bucket_name": "S3 Bucket Name",
+          "bucket_path": "Backup-Pfad (Optional)"
+        }
+      }
+    },
+    "error": {
+      "invalid_credentials": "Ungültige AWS-Anmeldeinformationen",
+      "invalid_bucket": "Bucket nicht gefunden oder keine Zugriffsrechte",
+      "unknown": "Unerwarteter Fehler"
+    },
+    "abort": {
+      "already_configured": "Amazon S3 Backup ist bereits konfiguriert"
+    }
+  }
+}
