@@ -8,6 +8,7 @@ import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import instance_id
@@ -22,6 +23,8 @@ from .const import (
     CONF_REGION_NAME,
     DOMAIN,
 )
+
+PLATFORMS = [Platform.BACKUP]
 
 DATA_BACKUP_AGENT_LISTENERS: HassKey[list[Callable[[], None]]] = HassKey(
     f"{DOMAIN}.backup_agent_listeners"
@@ -63,11 +66,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.async_on_unload(entry.async_on_state_change(async_notify_backup_listeners))
 
+    # Set up all platforms for this device/entry.
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    if hass.data[DOMAIN].get(entry.entry_id):
+    # Unload platforms
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+    # Remove config entry from domain
+    if unload_ok and hass.data[DOMAIN].get(entry.entry_id):
         hass.data[DOMAIN].pop(entry.entry_id)
-    return True
+
+    return unload_ok
