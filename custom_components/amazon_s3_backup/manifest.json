@@ -9,5 +9,7 @@
   "iot_class": "cloud_polling",
   "requirements": ["boto3>=1.28.0"],
   "version": "0.1.0",
-  "issue_tracker": "https://github.com/tobiaskuntzsch/AmazonWebServicesS3Backup/issues"
+  "issue_tracker": "https://github.com/tobiaskuntzsch/AmazonWebServicesS3Backup/issues",
+  "logo": "logo.png",
+  "icon": "icon.png"
 }
