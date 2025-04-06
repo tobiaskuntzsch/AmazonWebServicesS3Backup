@@ -63,19 +63,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.async_on_unload(entry.async_on_state_change(async_notify_backup_listeners))
 
-    # Load backup platform
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setup(entry, "backup")
-    )
+    # Import backup module directly
+    from . import backup
+
+    # Initialize the backup platform
+    await backup.async_setup_entry(hass, entry, None)
     
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    # Unload backup platform
-    await hass.config_entries.async_forward_entry_unload(entry, "backup")
-    
     # Remove config entry from domain
     if hass.data[DOMAIN].get(entry.entry_id):
         hass.data[DOMAIN].pop(entry.entry_id)
