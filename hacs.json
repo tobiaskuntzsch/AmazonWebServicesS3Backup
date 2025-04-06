@@ -1,0 +1,10 @@
+{
+    "name": "Amazon S3 Backup",
+    "render_readme": true,
+    "homeassistant": "2025.1.0",
+    "hacs": "1.6.0",
+    "domains": [
+        "backup"
+    ],
+    "iot_class": "cloud_polling"
+}
