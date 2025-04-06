@@ -35,9 +35,15 @@ class S3Client:
         self._aws_secret_access_key = aws_secret_access_key
         self._region_name = region_name
         self._bucket_name = bucket_name
-        self._bucket_path = bucket_path or ""
+        
+        # Standardize bucket_path: ensure it exists, doesn't start with / but ends with /
+        self._bucket_path = bucket_path.strip() if bucket_path else ""
+        if self._bucket_path.startswith("/"):
+            self._bucket_path = self._bucket_path[1:]
         if self._bucket_path and not self._bucket_path.endswith("/"):
             self._bucket_path += "/"
+            
+        _LOGGER.info("S3 bucket path configured: '%s'", self._bucket_path)
         self._ha_instance_id = ha_instance_id
         self._s3_client = None
 
@@ -98,7 +104,7 @@ class S3Client:
             
             # Upload the backup file
             _LOGGER.debug(
-                "Uploading backup %s to S3 bucket %s at key %s",
+                "Uploading backup %s to S3 bucket %s at key '%s'",
                 backup.backup_id,
                 self._bucket_name,
                 backup_key,
@@ -120,7 +126,7 @@ class S3Client:
             
             # Store metadata as a separate JSON file
             _LOGGER.debug(
-                "Storing metadata for backup %s to S3 bucket %s at key %s",
+                "Storing metadata for backup %s to S3 bucket %s at key '%s'",
                 backup.backup_id,
                 self._bucket_name,
                 metadata_key,
@@ -136,9 +142,10 @@ class S3Client:
                 )
             )
             
-            _LOGGER.debug(
-                "Successfully uploaded backup %s to S3", 
-                backup.backup_id
+            _LOGGER.info(
+                "Successfully uploaded backup %s to S3 with key '%s'", 
+                backup.backup_id,
+                backup_key
             )
         finally:
             # Clean up temp file
@@ -153,6 +160,8 @@ class S3Client:
         # List metadata files
         metadata_prefix = f"{self._bucket_path}metadata/"
         
+        _LOGGER.debug("Looking for backup metadata in '%s'", metadata_prefix)
+        
         try:
             response = await asyncio.get_event_loop().run_in_executor(
                 None,
@@ -163,6 +172,7 @@ class S3Client:
             )
             
             if "Contents" not in response:
+                _LOGGER.info("No backup metadata found in prefix '%s'", metadata_prefix)
                 return []
                 
             for item in response["Contents"]:
@@ -197,6 +207,7 @@ class S3Client:
         
         try:
             # First get the metadata to know the backup filename
+            _LOGGER.debug("Getting metadata from '%s' to determine backup file", metadata_key)
             metadata_obj = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: s3_client.get_object(
@@ -214,6 +225,7 @@ class S3Client:
             backup_key = self._get_backup_key(filename)
             
             # Delete backup file
+            _LOGGER.debug("Deleting backup file from '%s'", backup_key)
             await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: s3_client.delete_object(
@@ -223,6 +235,7 @@ class S3Client:
             )
             
             # Delete metadata file
+            _LOGGER.debug("Deleting metadata file from '%s'", metadata_key)
             await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: s3_client.delete_object(
@@ -231,7 +244,7 @@ class S3Client:
                 )
             )
             
-            _LOGGER.debug("Successfully deleted backup %s from S3", backup_id)
+            _LOGGER.info("Successfully deleted backup %s from S3", backup_id)
         except (ClientError, NoCredentialsError) as err:
             _LOGGER.error("Error deleting backup %s: %s", backup_id, err)
             raise
@@ -245,6 +258,7 @@ class S3Client:
         
         try:
             # First get the metadata to know the backup filename
+            _LOGGER.debug("Getting metadata from '%s' to determine backup file for download", metadata_key)
             metadata_obj = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: s3_client.get_object(
@@ -265,6 +279,7 @@ class S3Client:
             temp_file_path = f"/tmp/{filename}"
             
             # Download backup file
+            _LOGGER.debug("Downloading backup file from '%s' to '%s'", backup_key, temp_file_path)
             await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: s3_client.download_file(
@@ -274,7 +289,7 @@ class S3Client:
                 )
             )
             
-            _LOGGER.debug(
+            _LOGGER.info(
                 "Successfully downloaded backup %s from S3 to %s", 
                 backup_id, 
                 temp_file_path
