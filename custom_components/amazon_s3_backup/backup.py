@@ -7,7 +7,6 @@ import os
 from typing import cast
 
 from homeassistant.components.backup import (
-    async_register_backup_platform,
     BackupPlatform,
     BackupPlatformError,
     BackupRequest,
@@ -70,6 +69,24 @@ async def async_setup_entry(
         list_backups=async_list_backups,
     )
 
-    # Register the platform
-    _LOGGER.info("Registering Amazon S3 backup platform: %s", config_entry.title)
-    async_register_backup_platform(hass, platform)
+    # Try to register the platform directly with the backup component
+    # This approach works for Home Assistant 2025
+    try:
+        from homeassistant.components.backup import async_register_backup_platform
+        _LOGGER.info("Registering Amazon S3 backup platform using async_register_backup_platform")
+        async_register_backup_platform(hass, platform)
+    except ImportError:
+        # Fallback for Home Assistant 2025
+        _LOGGER.info("Registering Amazon S3 backup platform using internal API")
+        from homeassistant.components import backup
+        
+        if hasattr(backup, "PLATFORMS"):
+            # Try to register using direct assignment to PLATFORMS
+            backup.PLATFORMS.append(platform)
+            _LOGGER.info("Added platform to backup.PLATFORMS")
+        elif hasattr(backup, "_platforms"):
+            # Try to register using direct assignment to _platforms
+            backup._platforms.append(platform)
+            _LOGGER.info("Added platform to backup._platforms")
+        else:
+            _LOGGER.error("Could not register backup platform, unsupported Home Assistant version")
