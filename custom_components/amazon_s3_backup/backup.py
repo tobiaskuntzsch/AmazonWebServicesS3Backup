@@ -33,6 +33,7 @@ async def async_setup_entry(
         try:
             await client.async_upload_backup(request.backup_open_stream, request.backup)
         except Exception as err:
+            _LOGGER.error("Error uploading backup to Amazon S3: %s", err)
             raise BackupPlatformError(f"Error uploading to Amazon S3: {err}") from err
 
     async def async_download_backup(backup_id: str) -> str:
@@ -40,6 +41,7 @@ async def async_setup_entry(
         try:
             return await client.async_download(backup_id)
         except Exception as err:
+            _LOGGER.error("Error downloading backup from Amazon S3: %s", err)
             raise BackupPlatformError(f"Error downloading from Amazon S3: {err}") from err
 
     async def async_remove_backup(backup_id: str) -> None:
@@ -47,6 +49,7 @@ async def async_setup_entry(
         try:
             await client.async_delete(backup_id)
         except Exception as err:
+            _LOGGER.error("Error removing backup from Amazon S3: %s", err)
             raise BackupPlatformError(f"Error removing from Amazon S3: {err}") from err
 
     async def async_list_backups() -> list:
@@ -54,8 +57,10 @@ async def async_setup_entry(
         try:
             return await client.async_list_backups()
         except Exception as err:
+            _LOGGER.error("Error listing backups from Amazon S3: %s", err)
             raise BackupPlatformError(f"Error listing from Amazon S3: {err}") from err
 
+    # Create the backup platform
     platform = BackupPlatform(
         domain=DOMAIN,
         name=config_entry.title,
@@ -66,4 +71,5 @@ async def async_setup_entry(
     )
 
     # Register the platform
+    _LOGGER.info("Registering Amazon S3 backup platform: %s", config_entry.title)
     async_register_backup_platform(hass, platform)
