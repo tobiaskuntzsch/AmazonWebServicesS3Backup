@@ -93,10 +93,11 @@ class S3Client:
         temp_file_path = f"/tmp/{filename}"
         
         # Write stream to temp file
-        async with open_stream() as stream:
-            with open(temp_file_path, "wb") as temp_file:
-                async for chunk in stream:
-                    temp_file.write(chunk)
+        stream = await open_stream()  # Hier wird open_stream aufgerufen und der Iterator zurückgegeben
+        
+        with open(temp_file_path, "wb") as temp_file:
+            async for chunk in stream:  # Dann iterieren wir direkt über den Iterator
+                temp_file.write(chunk)
 
         # Upload the backup file and metadata
         try:
