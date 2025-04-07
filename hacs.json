@@ -1,16 +1,9 @@
 {
     "name": "Amazon S3 Backup",
     "render_readme": true,
-    "homeassistant": "2025.1.0",
-    "hacs": "1.6.0",
     "domains": [
         "backup"
     ],
-    "iot_class": "cloud_polling",
-    "filename": "amazon_s3_backup.zip",
-    "content_in_root": false,
-    "zip_release": false,
-    "hide_default_branch": false,
     "country": ["ALL"],
     "category": "integration"
 }

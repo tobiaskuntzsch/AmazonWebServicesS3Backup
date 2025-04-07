@@ -1,7 +1,6 @@
 # Amazon S3 Backup für Home Assistant
 
 [![GitHub Release][releases-shield]][releases]
-[![HACS Badge][hacs-shield]][hacs]
 [![License][license-shield]](LICENSE)
 
 Diese Home Assistant Integration ermöglicht das Speichern von Backups in Amazon S3.
@@ -21,11 +20,8 @@ Diese Home Assistant Integration ermöglicht das Speichern von Backups in Amazon
 4. Suchen Sie nach "Amazon S3 Backup"
 5. Folgen Sie dem Konfigurationsassistenten
 
-
 ***
 
 [releases-shield]: https://img.shields.io/github/release/tobiaskuntzsch/AmazonWebServicesS3Backup.svg
 [releases]: https://github.com/tobiaskuntzsch/AmazonWebServicesS3Backup/releases
-[hacs-shield]: https://img.shields.io/badge/HACS-Custom-orange.svg
-[hacs]: https://github.com/hacs/integration
 [license-shield]: https://img.shields.io/github/license/tobiaskuntzsch/AmazonWebServicesS3Backup.svg
