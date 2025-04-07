@@ -21,13 +21,6 @@ Diese Home Assistant Integration ermöglicht das Speichern von Backups in Amazon
 4. Suchen Sie nach "Amazon S3 Backup"
 5. Folgen Sie dem Konfigurationsassistenten
 
-{% if not installed %}
-## Installation
-
-- Stellen Sie sicher, dass [HACS](https://hacs.xyz/) installiert ist
-- Suchen Sie in HACS nach "Amazon S3 Backup"
-- Installieren Sie die Integration und starten Sie Home Assistant neu
-{% endif %}
 
 ***
 
