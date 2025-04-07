@@ -8,6 +8,5 @@
   "version": "0.1.0",
   "render_readme": true,
   "iot_class": "cloud_polling",
-  "logo": "https://raw.githubusercontent.com/tobiaskuntzsch/AmazonWebServicesS3Backup/main/logo.png",
-  "icon": "mdi:amazon"
+  "description": "Store Home Assistant backups in Amazon S3"
 }
