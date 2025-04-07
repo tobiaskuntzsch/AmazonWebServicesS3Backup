@@ -9,6 +9,5 @@
   "iot_class": "cloud_polling",
   "requirements": ["boto3>=1.28.0"],
   "version": "0.1.0",
-  "issue_tracker": "https://github.com/tobiaskuntzsch/AmazonWebServicesS3Backup/issues",
-  "icon": "homeassistant://brands/aws_cost"
+  "issue_tracker": "https://github.com/tobiaskuntzsch/AmazonWebServicesS3Backup/issues"
 }
